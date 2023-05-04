@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef DEV_LOWLEVEL_H_
-#define DEV_LOWLEVEL_H_
+#ifndef USB_HAL_H_
+#define USB_HAL_H_
 
 // For memcpy
 #include <string.h>
@@ -21,6 +21,8 @@
 #include "hardware/resets.h"
 
 typedef void (*usb_ep_handler)(uint8_t *buf, uint16_t len);
+typedef void (*usb_setup_handler)(struct usb_setup_packet *pkt);
+typedef void (*usb_bus_reset_handler)(void);
 
 // Struct in which we keep the endpoint configuration
 struct usb_endpoint_configuration
@@ -46,6 +48,10 @@ struct usb_device_configuration
 	const struct usb_configuration_descriptor *config_descriptor;
 	const unsigned char *lang_descriptor;
 	const unsigned char **descriptor_strings;
+	// Function to handle bus reset
+	usb_bus_reset_handler busResetHandler;
+	// Function to handle setup packets
+	usb_setup_handler setupPktHandler;
 	// USB num endpoints is 16
 	struct usb_endpoint_configuration endpoints[USB_NUM_ENDPOINTS];
 };
@@ -90,9 +96,16 @@ extern struct usb_device_configuration dev_config;
 
 // Necessary USB functions
 void usb_device_init();
-bool done_usb_configuration();
 struct usb_endpoint_configuration *usb_get_endpoint_configuration(uint8_t addr);
 void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len);
-void handle_default_ep0_in_actions(uint8_t *buf, uint16_t len);
+
+/**
+ * @brief Set the assigned device address in the USB peripheral
+ *
+ */
+inline void usb_set_dev_addr(uint8_t dev_addr)
+{
+	usb_hw->dev_addr_ctrl = dev_addr;
+}
 
 #endif

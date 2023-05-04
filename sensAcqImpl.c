@@ -1,5 +1,10 @@
-#include "usb_device.h"
+#include "usb_hal.h"
 #include "sensAcqImpl.h"
+
+// Global variables for USB device state
+static bool should_set_address = false;
+static uint8_t dev_addr = 0;
+static volatile bool configured = false;
 
 // EP0 IN and OUT
 static const struct usb_endpoint_descriptor ep0_out = {
@@ -79,6 +84,10 @@ static const unsigned char *descriptor_strings[] = {
     (unsigned char *)"Pico Sensor Acquisition Device" // Product
 };
 
+// Bus reset handler
+void handleBusReset(void);
+// Setup packet handler
+void handleSetupPkt(struct usb_setup_packet *pkt);
 // EP handler declarations
 void ep0_in_handler(uint8_t *buf, uint16_t len);
 void ep0_out_handler(uint8_t *buf, uint16_t len);
@@ -92,6 +101,8 @@ struct usb_device_configuration dev_config =
         .config_descriptor = &config_descriptor,
         .lang_descriptor = lang_descriptor,
         .descriptor_strings = descriptor_strings,
+        .busResetHandler = handleBusReset,
+        .setupPktHandler = handleSetupPkt,
         .endpoints =
             {
                 {
@@ -277,7 +288,7 @@ bool initDataAcq()
         usb_device_init();
 
         // Wait until USB is configured
-        while (!done_usb_configuration())
+        while (!configured)
         {
             tight_loop_contents();
         }
@@ -292,9 +303,150 @@ bool initDataAcq()
         return false;
 }
 
+void handleBusReset(void)
+{
+    // Set address back to 0
+    dev_addr = 0;
+    should_set_address = false;
+    usb_set_dev_addr(dev_addr);
+    configured = false;
+}
+
+void handleSetupPkt(struct usb_setup_packet *pkt)
+{
+    uint8_t req_direction = pkt->bmRequestType;
+    uint8_t req = pkt->bRequest;
+
+    // Reset PID to 1 for EP0 IN
+    struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_IN_ADDR); // We'll probably need EP0 in
+    ep->next_pid = 1u;
+
+    if (req_direction == USB_DIR_OUT)
+    {
+        if (req == USB_REQUEST_SET_ADDRESS)
+        {
+            // Set address is a bit of a strange case because we have to send a 0 length status packet first with
+            // address 0
+            dev_addr = (pkt->wValue & 0xff);
+            // printf("Set address %d\r\n", dev_addr);
+            // Will set address in the callback phase
+            should_set_address = true;
+            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
+        }
+        else if (req == USB_REQUEST_SET_CONFIGURATION)
+        {
+            // Only one configuration so just acknowledge the request
+            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // USB enumeration finishes here
+            configured = true;
+        }
+        else
+        {
+            // Unknown OUT request
+            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
+        }
+    }
+    else if (req_direction == USB_DIR_IN)
+    {
+        if (req == USB_REQUEST_GET_DESCRIPTOR)
+        {
+            uint16_t descriptor_type = pkt->wValue >> 8;
+            if (descriptor_type == USB_DT_DEVICE)
+            {
+                ep->next_pid = 1;                                                       // Always respond with pid 1
+                uint16_t len = MIN(sizeof(struct usb_device_descriptor), pkt->wLength); // Calculate the amount of data
+                memcpy((void *)ep->data_buffer, (void *)dev_config.device_descriptor, len); // Copy the data to the ep0 in data buffer
+                usb_start_transfer(ep, NULL, len); // Make ep0 in ready for transfer
+            }
+            else if (descriptor_type == USB_DT_CONFIG)
+            {
+                volatile uint8_t *buf = ep->data_buffer;
+
+                // First request will want just the config descriptor
+                memcpy((void *)buf, dev_config.config_descriptor, sizeof(struct usb_configuration_descriptor));
+                buf += sizeof(struct usb_configuration_descriptor);
+
+                // If we need more than just the config descriptor copy it all
+                if (pkt->wLength >= dev_config.config_descriptor->wTotalLength)
+                {
+                    memcpy((void *)buf, dev_config.interface_descriptor, sizeof(struct usb_interface_descriptor));
+                    buf += sizeof(struct usb_interface_descriptor);
+
+                    // Copy all the endpoint descriptors starting from EP1
+                    for (uint i = 2; i < USB_NUM_ENDPOINTS; i++)
+                    {
+                        if (dev_config.endpoints[i].descriptor)
+                        {
+                            memcpy((void *)buf, dev_config.endpoints[i].descriptor, sizeof(struct usb_endpoint_descriptor));
+                            buf += sizeof(struct usb_endpoint_descriptor);
+                        }
+                    }
+                }
+
+                // Send data
+                // Get len by working out end of buffer subtract start of buffer
+                uint32_t len = (uint32_t)buf - (uint32_t)ep->data_buffer;
+                usb_start_transfer(ep, NULL, MIN(len, pkt->wLength));
+            }
+            else if (descriptor_type == USB_DT_STRING)
+            {
+                uint8_t i = pkt->wValue & 0xff;
+                uint8_t len = 0;
+
+                if (i == 0)
+                {
+                    len = 4;
+                    memcpy((void *)ep->data_buffer, dev_config.lang_descriptor, len);
+                }
+                else
+                {
+                    // Prepare fills in ep0_buf
+                    const unsigned char *str = dev_config.descriptor_strings[i - 1];
+                    // 2 for bLength + bDescriptorType + strlen * 2 because string is unicode. i.e. other byte will be 0
+                    len = 2 + (strlen((const char *)str) * 2);
+                    static const uint8_t bDescriptorType = 0x03;
+
+                    volatile uint8_t *buf = ep->data_buffer;
+                    *buf++ = len;
+                    *buf++ = bDescriptorType;
+
+                    uint8_t c;
+
+                    do
+                    {
+                        c = *str++;
+                        *buf++ = c;
+                        *buf++ = 0;
+                    } while (c != '\0');
+                }
+
+                usb_start_transfer(ep, NULL, MIN(len, pkt->wLength));
+            }
+            else
+            {
+                // printf("Unhandled GET_DESCRIPTOR type 0x%x\r\n", descriptor_type);
+            }
+        }
+        else
+        {
+            // printf("Other IN request (0x%x)\r\n", pkt->bRequest);
+        }
+    }
+}
+
 void ep0_in_handler(uint8_t *buf, uint16_t len)
 {
-    handle_default_ep0_in_actions(buf, len);
+    if (should_set_address)
+    {
+        // Set actual device address in hardware
+        usb_set_dev_addr(dev_addr);
+        should_set_address = false;
+    }
+    else
+    {
+        // Receive a zero length status packet from the host on EP0 OUT
+        struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_OUT_ADDR);
+        usb_start_transfer(ep, NULL, 0);
+    }
 }
 
 void ep0_out_handler(uint8_t *buf, uint16_t len)

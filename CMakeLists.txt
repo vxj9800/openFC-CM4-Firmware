@@ -14,7 +14,7 @@ pico_sdk_init()
 
 add_executable(sensorAcq
   main.c
-  usb_device.c
+  usb_hal.c
   lsm6ds3.c
   sensAcqImpl.c
 )

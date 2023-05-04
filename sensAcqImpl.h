@@ -1,13 +1,12 @@
-#include "usb_device.h"
+#ifndef SENSOR_ACQUISITION_IMPLEMENTATION_HEADER_H
+#define SENSOR_ACQUISITION_IMPLEMENTATION_HEADER_H
+
 // Include definitions for processing dma transfers
 #include "hardware/dma.h"
 // For getting timers value
 #include "hardware/timer.h"
 
 #include "pico/stdlib.h"
-
-#ifndef SENSOR_ACQUISITION_IMPLEMENTATION_HEADER_H
-#define SENSOR_ACQUISITION_IMPLEMENTATION_HEADER_H
 
 // Following definitions are used for the dataType field  of the
 // data_cfg_t  which indicates what is the data type of the values

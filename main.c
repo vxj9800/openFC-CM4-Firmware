@@ -13,7 +13,7 @@
 #include "hardware/timer.h"
 
 // Definitions for setting up usb device
-#include "usb_device.h"
+#include "usb_hal.h"
 
 #include "lsm6ds3.h"
 #include "sensAcqImpl.h"
