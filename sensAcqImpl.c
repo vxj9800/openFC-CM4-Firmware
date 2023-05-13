@@ -9,7 +9,7 @@ static volatile bool configured = false;
 // EP0 IN and OUT
 static const struct usb_endpoint_descriptor ep0_out = {
     .bLength = sizeof(struct usb_endpoint_descriptor),
-    .bDescriptorType = USB_DT_ENDPOINT,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_ENDPOINT,
     .bEndpointAddress = EP0_OUT_ADDR, // EP number 0, OUT from host (rx to device)
     .bmAttributes = USB_TRANSFER_TYPE_CONTROL,
     .wMaxPacketSize = 64,
@@ -17,7 +17,7 @@ static const struct usb_endpoint_descriptor ep0_out = {
 
 static const struct usb_endpoint_descriptor ep0_in = {
     .bLength = sizeof(struct usb_endpoint_descriptor),
-    .bDescriptorType = USB_DT_ENDPOINT,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_ENDPOINT,
     .bEndpointAddress = EP0_IN_ADDR, // EP number 0, OUT from host (rx to device)
     .bmAttributes = USB_TRANSFER_TYPE_CONTROL,
     .wMaxPacketSize = 64,
@@ -26,7 +26,7 @@ static const struct usb_endpoint_descriptor ep0_in = {
 // Descriptors
 static const struct usb_device_descriptor device_descriptor = {
     .bLength = sizeof(struct usb_device_descriptor),
-    .bDescriptorType = USB_DT_DEVICE,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_DEVICE,
     .bcdUSB = 0x0110,       // USB 1.1 device
     .bDeviceClass = 0,      // Specified in interface descriptor
     .bDeviceSubClass = 0,   // No subclass
@@ -43,7 +43,7 @@ static const struct usb_device_descriptor device_descriptor = {
 
 static const struct usb_interface_descriptor interface_descriptor = {
     .bLength = sizeof(struct usb_interface_descriptor),
-    .bDescriptorType = USB_DT_INTERFACE,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_INTERFACE,
     .bInterfaceNumber = 0,
     .bAlternateSetting = 0,
     .bNumEndpoints = 1,      // Interface has 2 endpoints
@@ -54,7 +54,7 @@ static const struct usb_interface_descriptor interface_descriptor = {
 
 static struct usb_endpoint_descriptor ep1_in = {
     .bLength = sizeof(struct usb_endpoint_descriptor),
-    .bDescriptorType = USB_DT_ENDPOINT,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_ENDPOINT,
     .bEndpointAddress = EP1_IN_ADDR, // EP number 1, IN to host (tx to device)
     .bmAttributes = USB_TRANSFER_TYPE_ISOCHRONOUS,
     .wMaxPacketSize = 0,    // Change this in initDataAcq function
@@ -62,7 +62,7 @@ static struct usb_endpoint_descriptor ep1_in = {
 
 static const struct usb_configuration_descriptor config_descriptor = {
     .bLength = sizeof(struct usb_configuration_descriptor),
-    .bDescriptorType = USB_DT_CONFIG,
+    .bDescriptorType = USB_DESCRIPTOR_TYPE_CONFIG,
     .wTotalLength = (sizeof(struct usb_configuration_descriptor) +
                      sizeof(struct usb_interface_descriptor) +
                      sizeof(struct usb_endpoint_descriptor)),
@@ -314,16 +314,13 @@ void handleBusReset(void)
 
 void handleSetupPkt(struct usb_setup_packet *pkt)
 {
-    uint8_t req_direction = pkt->bmRequestType;
-    uint8_t req = pkt->bRequest;
-
     // Reset PID to 1 for EP0 IN
     struct usb_endpoint_configuration *ep = usb_get_endpoint_configuration(EP0_IN_ADDR); // We'll probably need EP0 in
     ep->next_pid = 1u;
 
-    if (req_direction == USB_DIR_OUT)
+    if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_OUT | USB_REQ_TYPE_TYPE_STANDARD | USB_REQ_TYPE_RECIPIENT_DEVICE))
     {
-        if (req == USB_REQUEST_SET_ADDRESS)
+        if (pkt->bRequest == USB_REQUEST_SET_ADDRESS)
         {
             // Set address is a bit of a strange case because we have to send a 0 length status packet first with
             // address 0
@@ -333,7 +330,7 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
             should_set_address = true;
             usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
         }
-        else if (req == USB_REQUEST_SET_CONFIGURATION)
+        else if (pkt->bRequest == USB_REQUEST_SET_CONFIGURATION)
         {
             // Only one configuration so just acknowledge the request
             usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // USB enumeration finishes here
@@ -345,19 +342,19 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
             usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
         }
     }
-    else if (req_direction == USB_DIR_IN)
+    else if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_IN | USB_REQ_TYPE_TYPE_STANDARD | USB_REQ_TYPE_RECIPIENT_DEVICE))
     {
-        if (req == USB_REQUEST_GET_DESCRIPTOR)
+        if (pkt->bRequest == USB_REQUEST_GET_DESCRIPTOR)
         {
             uint16_t descriptor_type = pkt->wValue >> 8;
-            if (descriptor_type == USB_DT_DEVICE)
+            if (descriptor_type == USB_DESCRIPTOR_TYPE_DEVICE)
             {
                 ep->next_pid = 1;                                                       // Always respond with pid 1
                 uint16_t len = MIN(sizeof(struct usb_device_descriptor), pkt->wLength); // Calculate the amount of data
                 memcpy((void *)ep->data_buffer, (void *)dev_config.device_descriptor, len); // Copy the data to the ep0 in data buffer
                 usb_start_transfer(ep, NULL, len); // Make ep0 in ready for transfer
             }
-            else if (descriptor_type == USB_DT_CONFIG)
+            else if (descriptor_type == USB_DESCRIPTOR_TYPE_CONFIG)
             {
                 volatile uint8_t *buf = ep->data_buffer;
 
@@ -387,7 +384,7 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
                 uint32_t len = (uint32_t)buf - (uint32_t)ep->data_buffer;
                 usb_start_transfer(ep, NULL, MIN(len, pkt->wLength));
             }
-            else if (descriptor_type == USB_DT_STRING)
+            else if (descriptor_type == USB_DESCRIPTOR_TYPE_STRING)
             {
                 uint8_t i = pkt->wValue & 0xff;
                 uint8_t len = 0;

@@ -57,6 +57,8 @@ struct usb_device_configuration
 };
 extern struct usb_device_configuration dev_config;
 
+#define USB_DIR_IN 0x80u
+#define USB_DIR_OUT 0x00u
 #define EP0_IN_ADDR (USB_DIR_IN | 0)
 #define EP0_OUT_ADDR (USB_DIR_OUT | 0)
 #define EP1_IN_ADDR (USB_DIR_IN | 1)
