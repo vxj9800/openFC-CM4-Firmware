@@ -100,6 +100,7 @@ extern struct usb_device_configuration dev_config;
 void usb_device_init();
 struct usb_endpoint_configuration *usb_get_endpoint_configuration(uint8_t addr);
 void usb_start_transfer(struct usb_endpoint_configuration *ep, uint8_t *buf, uint16_t len);
+void send_stall_condition(struct usb_endpoint_configuration *ep);
 
 /**
  * @brief Set the assigned device address in the USB peripheral

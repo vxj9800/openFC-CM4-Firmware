@@ -263,3 +263,9 @@ void isr_usbctrl(void)
         // panic("Unhandled IRQ 0x%x\n", (uint)(status ^ handled));
     }
 }
+
+void send_stall_condition(struct usb_endpoint_configuration *ep)
+{
+    *ep->buffer_control |= USB_BUF_CTRL_STALL;
+    usb_hw_set->ep_stall_arm = USB_EP_STALL_ARM_EP0_IN_BITS;
+}

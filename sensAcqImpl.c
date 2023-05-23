@@ -27,7 +27,7 @@ static const struct usb_endpoint_descriptor ep0_in = {
 static const struct usb_device_descriptor device_descriptor = {
     .bLength = sizeof(struct usb_device_descriptor),
     .bDescriptorType = USB_DESCRIPTOR_TYPE_DEVICE,
-    .bcdUSB = 0x0110,       // USB 1.1 device
+    .bcdUSB = 0x0200,       // USB 2.0 device
     .bDeviceClass = 0,      // Specified in interface descriptor
     .bDeviceSubClass = 0,   // No subclass
     .bDeviceProtocol = 0,   // No protocol
@@ -353,6 +353,15 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
                 uint16_t len = MIN(sizeof(struct usb_device_descriptor), pkt->wLength); // Calculate the amount of data
                 memcpy((void *)ep->data_buffer, (void *)dev_config.device_descriptor, len); // Copy the data to the ep0 in data buffer
                 usb_start_transfer(ep, NULL, len); // Make ep0 in ready for transfer
+            }
+            else if (descriptor_type == USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER)
+            {
+                send_stall_condition(ep);
+                // *ep->buffer_control |= USB_BUF_CTRL_STALL;                                   // Send request error by sending stall condition
+                // ep->next_pid = 1;                                                           // Always respond with pid 1
+                // // uint16_t len = MIN(sizeof(struct usb_device_descriptor), pkt->wLength);     // Calculate the amount of data
+                // // memcpy((void *)ep->data_buffer, (void *)dev_config.device_descriptor, len); // Copy the data to the ep0 in data buffer
+                // usb_start_transfer(ep, NULL, 0);                                          // Make ep0 in ready for transfer
             }
             else if (descriptor_type == USB_DESCRIPTOR_TYPE_CONFIG)
             {
