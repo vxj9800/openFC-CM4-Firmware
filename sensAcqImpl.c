@@ -342,6 +342,22 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
             usb_start_transfer(ep, NULL, 0); // Acknowledge OUT request
         }
     }
+    else if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_IN | USB_REQ_TYPE_TYPE_VENDOR | USB_REQ_TYPE_RECIPIENT_DEVICE))
+    {
+        if (pkt->bRequest == USB_VEND_REQ_GET_SENS_INFO)
+        {
+            int sensNum = pkt->wIndex;                                            // Get the index of the sensor list
+            if (sensNum < numSensors)                                             // If the index is valid
+                usb_start_transfer(ep, (uint8_t *)&sensorList[sensNum], sizeof(data_cfg_t)); // Prepare ep0_in to send out the sensor config
+            else                                                                             // Unknown OUT request
+                usb_start_transfer(ep, NULL, 0); // Send a null data packet
+        }
+        else
+        {
+            // Unknown OUT request
+            usb_start_transfer(ep, NULL, 0); // Send a null data packet
+        }
+    }
     else if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_IN | USB_REQ_TYPE_TYPE_STANDARD | USB_REQ_TYPE_RECIPIENT_DEVICE))
     {
         if (pkt->bRequest == USB_REQUEST_GET_DESCRIPTOR)

@@ -32,6 +32,9 @@
 #define DTYPE_INT32     (DTYPE_4BYTES | DTYPE_SGND)
 #define DTYPE_INT64     (DTYPE_8BYTES | DTYPE_SGND)
 
+// Definitions for vendor specific requests
+#define USB_VEND_REQ_GET_SENS_INFO 0
+
 typedef struct
 {
     uint8_t sensType;
