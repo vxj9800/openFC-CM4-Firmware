@@ -328,18 +328,18 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
             // printf("Set address %d\r\n", dev_addr);
             // Will set address in the callback phase
             should_set_address = true;
-            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
+            usb_start_transfer(ep, NULL, 0); // Acknowledge OUT request
         }
         else if (pkt->bRequest == USB_REQUEST_SET_CONFIGURATION)
         {
             // Only one configuration so just acknowledge the request
-            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // USB enumeration finishes here
+            usb_start_transfer(ep, NULL, 0); // USB enumeration finishes here
             configured = true;
         }
         else
         {
             // Unknown OUT request
-            usb_start_transfer(usb_get_endpoint_configuration(EP0_IN_ADDR), NULL, 0); // Acknowledge OUT request
+            usb_start_transfer(ep, NULL, 0); // Acknowledge OUT request
         }
     }
     else if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_IN | USB_REQ_TYPE_TYPE_STANDARD | USB_REQ_TYPE_RECIPIENT_DEVICE))
@@ -356,12 +356,9 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
             }
             else if (descriptor_type == USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER)
             {
+                // Send a stall condition to indicate that the operation will be full-speed
+                // even though USB 2.0 is used.
                 send_stall_condition(ep);
-                // *ep->buffer_control |= USB_BUF_CTRL_STALL;                                   // Send request error by sending stall condition
-                // ep->next_pid = 1;                                                           // Always respond with pid 1
-                // // uint16_t len = MIN(sizeof(struct usb_device_descriptor), pkt->wLength);     // Calculate the amount of data
-                // // memcpy((void *)ep->data_buffer, (void *)dev_config.device_descriptor, len); // Copy the data to the ep0 in data buffer
-                // usb_start_transfer(ep, NULL, 0);                                          // Make ep0 in ready for transfer
             }
             else if (descriptor_type == USB_DESCRIPTOR_TYPE_CONFIG)
             {
