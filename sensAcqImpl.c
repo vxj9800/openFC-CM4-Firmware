@@ -344,13 +344,22 @@ void handleSetupPkt(struct usb_setup_packet *pkt)
     }
     else if (pkt->bmRequestType == (USB_REQ_TYPE_DIR_IN | USB_REQ_TYPE_TYPE_VENDOR | USB_REQ_TYPE_RECIPIENT_DEVICE))
     {
-        if (pkt->bRequest == USB_VEND_REQ_GET_SENS_INFO)
+        if (pkt->bRequest == USB_VEND_REQ_WHOAMI)
         {
-            int sensNum = pkt->wIndex;                                            // Get the index of the sensor list
-            if (sensNum < numSensors)                                             // If the index is valid
-                usb_start_transfer(ep, (uint8_t *)&sensorList[sensNum], sizeof(data_cfg_t)); // Prepare ep0_in to send out the sensor config
+            char iamStr[16] = "picoSensActuHAT";
+            usb_start_transfer(ep, (uint8_t *)iamStr, MIN(pkt->wLength,16)); // Prepare ep0_in to send out WHOAMI
+        }
+        else if (pkt->bRequest == USB_VEND_REQ_NSENS)
+        {
+            usb_start_transfer(ep, &numSensors, MIN(pkt->wLength, sizeof(numSensors))); // Prepare ep0_in to send out NSENS
+        }
+        else if (pkt->bRequest == USB_VEND_REQ_SENS_INFO)
+        {
+            int sensNum = pkt->wIndex;                                                       // Get the index of the sensor list
+            if (sensNum < numSensors)                                                        // If the index is valid
+                usb_start_transfer(ep, (uint8_t *)&sensorList[sensNum], MIN(pkt->wLength, sizeof(data_cfg_t))); // Prepare ep0_in to send out the sensor config
             else                                                                             // Unknown OUT request
-                usb_start_transfer(ep, NULL, 0); // Send a null data packet
+                usb_start_transfer(ep, NULL, 0);                                             // Send a null data packet
         }
         else
         {

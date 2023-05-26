@@ -33,7 +33,11 @@
 #define DTYPE_INT64     (DTYPE_8BYTES | DTYPE_SGND)
 
 // Definitions for vendor specific requests
-#define USB_VEND_REQ_GET_SENS_INFO 0
+#define USB_VEND_REQ_WHOAMI 0
+#define USB_VEND_REQ_NSENS 1
+#define USB_VEND_REQ_NACTU 2
+#define USB_VEND_REQ_SENS_INFO 3
+#define USB_VEND_REQ_ACTU_INFO 4
 
 typedef struct
 {
