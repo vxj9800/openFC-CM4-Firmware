@@ -242,9 +242,8 @@ bool register_sensor(uint8_t sensType, uint8_t dataType, uint8_t nDataVals, uint
         // Make sure that the size of the usb packet doesn't become larger than 1023 bytes.
         // The sum below accounts for
         //   size of the total sensor data(including the one being added)
-        // + 8 bytes for timestamp
         // + ceil(numSensors / 8) for drdy bits that will  be sent in the packet
-        if ((sensDataSize + 8 + (dataType & DTYPE_WIDTH_MASK) * nDataVals + (numSensors + 8 - 1) / 8) < 1024 && numSensors < 128)
+        if ((sensDataSize + (dataType & DTYPE_WIDTH_MASK) * nDataVals + (numSensors + 8 - 1) / 8) < 1024 && numSensors < 128)
         {
             sensorList[numSensors].sensType = sensType;
             sensorList[numSensors].dataType = dataType;
@@ -268,12 +267,11 @@ bool initDataAcq()
     // Although this should not happen, make sure that the size of the usb packet doesn't become larger than 1023 bytes.
     // The sum below accounts for
     //   size of the total sensor data
-    // + 8 bytes for timestamp
     // + ceil(numSensors / 8) for drdy bits that will  be sent in the packet
-    if ((sensDataSize + 8 + (numSensors + 8 - 1) / 8) < 1024)
+    if ((sensDataSize + (numSensors + 8 - 1) / 8) < 1024)
     {
         // Define the wMaxPacketSize for ep1_in
-        ep1_in.wMaxPacketSize = (sensDataSize + 8 + (numSensors + 8 - 1) / 8);
+        ep1_in.wMaxPacketSize = (sensDataSize + (numSensors + 8 - 1) / 8);
 
         // Update the number of data ready bytes required so that other data can be arranged accordingly
         nDRDYbytes = (numSensors + 8 - 1) / 8;
@@ -498,17 +496,9 @@ void ep1_in_handler(uint8_t *buf, uint16_t len)
         else
             *(buf + i / 8) &= ~(1 << (i % 8));
 
-    // Update buf to point to the time value, and add nDRDYbytes to len
+    // Update buf to point to the start of sensor data region, and add nDRDYbytes to len
     buf += nDRDYbytes;
     len += nDRDYbytes;
-
-    // Copy current time to the USB ram
-    uint64_t time = time_us_64();
-    memcpy((void *)buf, (void *)&time, sizeof(time));
-
-    // Update buf to point to the start of sensor data region, and add 8 bytes to len
-    buf += 8;
-    len += 8;
 
     // Setup the sensor data control blocks for the new sensor data that has not been sent yet.
     uint8_t ctrlBlckLoc = 0;
@@ -527,7 +517,7 @@ void ep1_in_handler(uint8_t *buf, uint16_t len)
     // Add a null control block at the end to terminate the dma transfers
     sens_data_control_blocks[ctrlBlckLoc].nBytes = 0;
     sens_data_control_blocks[ctrlBlckLoc].readAddr = NULL;
-    // Initiate dma transfers for sensor data at the location after the 64-bit time value
+    // Initiate dma transfers for sensor data
     transfer_data_to_ep1_in_buf(buf);
 
     // Setup the sensor data ready control blocks to indicate that the sensor data has been read

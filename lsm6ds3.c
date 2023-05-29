@@ -114,6 +114,7 @@ void lsm6ds3_setup()
 
 bool lsm6ds3_update_data(repeating_timer_t *tmr)
 {
+    gpio_xor_mask(1 << 13);
     if (!lsm6ds3_drdy)
     {
         read_registers(STATUS_REG, (uint8_t *)&data_report, sizeof(data_report));

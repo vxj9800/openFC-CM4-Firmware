@@ -16,6 +16,7 @@ add_executable(sensorAcq
   main.c
   usb_hal.c
   lsm6ds3.c
+  timeSens.c
   sensAcqImpl.c
 )
 pico_add_extra_outputs(sensorAcq)

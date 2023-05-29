@@ -16,6 +16,7 @@
 #include "usb_hal.h"
 
 #include "lsm6ds3.h"
+#include "timeSens.h"
 #include "sensAcqImpl.h"
 
 // LEDs for status
@@ -30,6 +31,9 @@ int main(void) {
 
     // Initialize the IMU
     lsm6ds3_setup();
+
+    // Initialize the Timer
+    timeSens_setup();
 
     if(initDataAcq())
     {
