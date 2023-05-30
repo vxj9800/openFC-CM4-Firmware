@@ -202,7 +202,7 @@ void transfer_data_to_ep1_in_buf(volatile void *ep1_in_buff_add)
 
 void transfer_data_to_drdy_vars()
 {
-    bool drdyVal = 0;
+    static bool drdyVal = false;
     channel_config_set_read_increment(&usb_ep1_in_data_chan_cfg, false);                                       // Don't increment read address for data chan
     dma_channel_set_config(usb_ep1_in_data_chan, &usb_ep1_in_data_chan_cfg, false);                            // Update the configuration of data chan
     dma_channel_set_read_addr(usb_ep1_in_data_chan, &drdyVal, false);                                          // Initial read address for data chan
